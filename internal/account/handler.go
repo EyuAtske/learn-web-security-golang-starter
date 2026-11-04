@@ -3,8 +3,10 @@ package account
 import (
 	"errors"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -58,6 +60,19 @@ type totpBackupCodesView struct {
 
 func (handler *Handler) Page(responseWriter http.ResponseWriter, request *http.Request) {
 	current, ok := handler.requireAuth(responseWriter, request)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	slog.SetDefault(logger)
+
+	handler.logger.Event("account_accessed",
+		map[string]any{
+			"userId": current.User.ID,
+			"email": current.User.Email,
+			"expiresAt": current.Session.ExpiresAt,
+		},
+	)
+
 	if !ok {
 		return
 	}
