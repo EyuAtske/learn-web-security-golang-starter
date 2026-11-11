@@ -1,6 +1,8 @@
 package assistant
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestRequestedOrderID(t *testing.T) {
 	orderID, found := requestedOrderID("What is the status of order #42?")
