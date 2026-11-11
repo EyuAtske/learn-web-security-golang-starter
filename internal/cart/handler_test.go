@@ -20,10 +20,24 @@ func TestParseQuantityAcceptsCanonicalValues(t *testing.T) {
 	}
 }
 
-func TestParseQuantityRejectsOutOfRangeValues(t *testing.T) {
-	for _, value := range []string{"-1", "100"} {
-		if _, valid := parseQuantity(value, 0); valid {
-			t.Errorf("parseQuantity(%q, 0) accepted an out-of-range quantity", value)
+func TestParseQuantityRejectsInvalidValues(t *testing.T) {
+	testCases := []struct {
+		value   string
+		minimum int64
+	}{
+		{value: "0", minimum: 1},
+		{value: "00", minimum: 0},
+		{value: "01", minimum: 0},
+		{value: "-1", minimum: 0},
+		{value: "+1", minimum: 0},
+		{value: "1.0", minimum: 0},
+		{value: " 1", minimum: 0},
+		{value: "100", minimum: 0},
+		{value: "", minimum: 0},
+	}
+	for _, testCase := range testCases {
+		if _, valid := parseQuantity(testCase.value, testCase.minimum); valid {
+			t.Errorf("parseQuantity(%q, %d) accepted an invalid quantity", testCase.value, testCase.minimum)
 		}
 	}
 }
