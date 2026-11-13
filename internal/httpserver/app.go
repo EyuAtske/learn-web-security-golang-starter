@@ -218,7 +218,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	dynamicHandler := applyMiddleware(
 		permissiveCORS(dynamicMux),
 		checkRequestOrigin(options.AppOrigin, renderer),
-	)
+	) 
 
 	mainMux := http.NewServeMux()
 	mainMux.HandleFunc("GET /health", func(responseWriter http.ResponseWriter, _ *http.Request) {
@@ -239,6 +239,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	handler := applyMiddleware(
 		mainMux,
 		cspNonce,
+		contentSecurityPolicy,
 		recoverPanics(logger, renderer),
 		contentTypeOptions,
 	)
