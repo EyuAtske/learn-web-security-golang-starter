@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,6 +45,40 @@ func permissiveCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(responseWriter, request)
 	})
+}
+
+func checkRequestOrigin(appOrigin string, renderer *templates.Renderer) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodPost {
+				next.ServeHTTP(responseWriter, request)
+				return
+			}
+
+			origins := request.Header.Values("Origin")
+			trusted := len(origins) == 1 && origins[0] == appOrigin
+			if len(origins) == 0 {
+				referers := request.Header.Values("Referer")
+				trusted = len(referers) == 1 && refererOrigin(referers[0]) == appOrigin
+			}
+			if trusted {
+				next.ServeHTTP(responseWriter, request)
+				return
+			}
+
+			if err := httpx.RespondWithErrorPage(responseWriter, renderer, http.StatusForbidden, "Forbidden", "The request origin could not be verified."); err != nil {
+				http.Error(responseWriter, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			}
+		})
+	}
+}
+
+func refererOrigin(referer string) string {
+	parsed, err := url.Parse(referer)
+	if err != nil || !parsed.IsAbs() || parsed.Opaque != "" || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func cspNonce(next http.Handler) http.Handler {
