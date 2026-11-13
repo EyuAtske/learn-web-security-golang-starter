@@ -83,6 +83,9 @@ func (handler *Handler) Submit(responseWriter http.ResponseWriter, request *http
 	if !ok {
 		return
 	}
+	if !ok || !handler.verifyCSRF(responseWriter, request, current.Session.CSRFToken) {
+		return
+	}
 	items, err := handler.cartStore.ListItems(request.Context(), current.User.ID)
 	if err != nil {
 		handler.internalError(responseWriter, request, err)
@@ -260,4 +263,17 @@ func firstUnavailable(items []cart.Item) *cart.Item {
 func parseDiscount(value string) int64 {
 	discount, _ := strconv.ParseInt(value, 10, 64)
 	return discount
+}
+
+func (handler *Handler) verifyCSRF(responseWriter http.ResponseWriter, request *http.Request, expectedToken string) bool {
+	actualToken, err := httpx.FormValue(request, "csrfToken")
+	if err != nil {
+		handler.errorPage(responseWriter, http.StatusInternalServerError,"Invalid Request", "The submitted form is invalid.")
+		return false
+	}
+	if sessions.CSRFTokensMatch(expectedToken, actualToken) {
+		return true
+	}
+	handler.errorPage(responseWriter, http.StatusForbidden, "Forbidden", "Your request could not be verified.")
+	return false
 }
