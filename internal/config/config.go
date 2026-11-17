@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -27,6 +29,7 @@ const (
 
 type Config struct {
 	PawPalAPIKey               string
+	DownloadSigningKey         [32]byte
 	AppOrigin                  string
 	Port                       int
 	DatabasePath               string
@@ -43,11 +46,19 @@ type AttackerLabConfig struct {
 }
 
 func Load(workingDirectory string) (Config, error) {
-	return Parse(processEnvironment(), workingDirectory)
+	environment, err := LoadEnv(workingDirectory)
+	if err != nil {
+		return Config{}, err
+	}
+	return Parse(environment, workingDirectory)
 }
 
 func LoadAttackerLab(workingDirectory string) (AttackerLabConfig, error) {
-	return ParseAttackerLab(processEnvironment())
+	environment, err := LoadEnv(workingDirectory)
+	if err != nil {
+		return AttackerLabConfig{}, err
+	}
+	return ParseAttackerLab(environment)
 }
 
 func Parse(environment map[string]string, workingDirectory string) (Config, error) {
@@ -79,12 +90,22 @@ func Parse(environment map[string]string, workingDirectory string) (Config, erro
 	}
 
 	pawpalPath, err := requireEnvironmentVariable(environment, "PAWPAL_API_KEY")
-	if err != nil{
+	if err != nil {
+		return Config{}, err
+	}
+
+	downloadSigning, err := requireEnvironmentVariable(environment, "DOWNLOAD_SIGNING_KEY")
+	if err != nil {
+		return Config{}, err
+	}
+	downloadSigningKey, err := parseEncryptionKey(downloadSigning, "DOWNLOAD_SIGNING_KEY")
+	if err != nil {
 		return Config{}, err
 	}
 
 	return Config{
 		PawPalAPIKey:               pawpalPath,
+		DownloadSigningKey:         downloadSigningKey,
 		AppOrigin:                  appOrigin,
 		Port:                       port,
 		DatabasePath:               databasePath,
@@ -227,9 +248,34 @@ func normalizeEncryptionVersion(version string) (string, error) {
 }
 
 func requireEnvironmentVariable(environment map[string]string, name string) (string, error) {
-    value := environment[name]
-    if value == "" {
-        return "", fmt.Errorf("missing required environment variable: %s", name)
-    }
-    return value, nil
+	value := environment[name]
+	if value == "" {
+		return "", fmt.Errorf("missing required environment variable: %s", name)
+	}
+	return value, nil
+}
+
+func LoadEnv(workingDirectory string) (map[string]string, error) {
+	envMap := make(map[string]string)
+	envPath := filepath.Join(workingDirectory, ".env")
+
+	if _, err := os.Stat(envPath); err == nil {
+		fileVars, err := godotenv.Read(envPath)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range fileVars {
+			envMap[k] = v
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	for _, entry := range os.Environ() {
+		if k, v, ok := strings.Cut(entry, "="); ok {
+			envMap[k] = v
+		}
+	}
+
+	return envMap, nil
 }
