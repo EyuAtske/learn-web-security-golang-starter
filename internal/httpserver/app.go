@@ -233,23 +233,23 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 		httpx.RespondWithJSON(responseWriter, http.StatusOK, map[string]any{"ok": true, "app": "bearly-secure"})
 	})
 	staticHandler := newStaticHandler(publicRoot)
+	crossOriginWidgetAssetHandler := applyMiddleware(staticHandler, crossOriginResourcePolicy)
 	mainMux.Handle("GET /reset.css", staticHandler)
 	mainMux.Handle("GET /styles.css", staticHandler)
 	mainMux.Handle("GET /passkey.js", staticHandler)
 	mainMux.Handle("GET /vendor/simplewebauthn/index.umd.min.js", staticHandler)
-	mainMux.Handle("GET /shipping-widget.css", staticHandler)
+	mainMux.Handle("GET /shipping-widget.css", crossOriginWidgetAssetHandler)
 	mainMux.Handle("GET /shipping-widget.html", staticHandler)
-	mainMux.Handle("GET /shipping-widget.js", staticHandler)
+	mainMux.Handle("GET /shipping-widget.js", crossOriginWidgetAssetHandler)
 	mainMux.Handle("GET /product-photos/{filename}", staticHandler)
 	mainMux.HandleFunc("POST /integrations/pawpal/webhook", pawPalHandler.Webhook)
 	mainMux.Handle("/", dynamicHandler)
 
 	handler := applyMiddleware(
 		mainMux,
+		securityHeaders,
 		cspNonce,
-		contentSecurityPolicy,
 		recoverPanics(logger, renderer),
-		contentTypeOptions,
 	)
 	return &Application{Handler: handler, publicRoot: publicRoot}, nil
 }
